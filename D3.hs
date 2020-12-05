@@ -12,15 +12,17 @@ numTrees dx dy terrain = length $ filter isTree $ ( map head ) mungedTerrain
 d3bSlopes :: [(Int, Int)]
 d3bSlopes = [(1, 1),(3, 1),(5, 1),(7, 1),(1, 2)];
 
+d3Data =
+  do
+    contents <- readFile "d3.dat"
+    return (lines contents)
+
 d3Main :: IO()
 d3Main = do
-  let dataFile = "d3.dat"
-  contents <- readFile dataFile
-  let terrain = lines contents
+  terrain <- d3Data
 
   let d3aNumTrees = (numTrees 3 1 terrain)
   putStrLn $ "D3a: " ++ (show d3aNumTrees)
 
   let d3bNumTrees = product [numTrees dx dy terrain | (dx, dy) <- d3bSlopes]
   putStrLn $ "D3b: " ++ (show d3bNumTrees)
-
