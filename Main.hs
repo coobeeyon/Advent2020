@@ -4,6 +4,7 @@ import D1
 import D2
 import D3
 import D4
+import D5
 
 main :: IO()
 main = do
