@@ -24,8 +24,7 @@ validHairColor :: String -> Bool
 validHairColor hairColor =
   length hairColor == 7 &&
   head hairColor == '#' &&
-  all (`elem` hexDigits) (drop 1 hairColor)
-  where hexDigits = ['a'..'f']++['0'..'9']
+  all isHexDigit (drop 1 hairColor)
 
 validEyeColor eyeColor =
   eyeColor `elem` [ "amb", "blu", "brn", "gry", "grn", "hzl", "oth" ]
@@ -34,12 +33,13 @@ validEntry :: String -> String -> Bool
 validEntry "byr" = validYear 1920 2002
 validEntry "iyr" = validYear 2010 2020
 validEntry "eyr" = validYear 2020 2030
-validEntry "hgt" = \value ->
-    let units = dropWhile isDigit value in
-      case units of
-        "in" -> validHeightIn (take 2 value)
-        "cm" -> validHeightCm (take 3 value)
-        _ -> False
+validEntry "hgt" =
+  \value ->
+    let (numUnits, unitType) = span isDigit value in
+    case unitType of
+      "cm" -> validHeightCm numUnits
+      "in" -> validHeightIn numUnits
+      _    -> False
 validEntry "hcl" = validHairColor
 validEntry "ecl" = validEyeColor
 validEntry "pid" = validNumDigits 9
