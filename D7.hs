@@ -6,54 +6,74 @@ import Text.ParserCombinators.Parsec
 data Bag  = Bag String String deriving(Show, Eq)
 data BagQuantity = BagQuantity Int Bag deriving(Show, Eq)
 
-csvFile = endBy line eol
-line = do
-  outsideBag <- bag
-  whitespace
+--
+-- Parser
+--
+fileP = endBy lineP eol
+lineP = do
+  outsideBag <- bagP
+  whitespaceP
   string "contain"
-  insideBags <- try nobags <|> containedBags
+  insideBags <- try noBagsP <|> containedBagsP
   return (outsideBag, insideBags)
 
-bag = do
-  whitespace
-  bt <- identifier
-  whitespace
-  bc <- identifier
-  whitespace
+bagP = do
+  bt <- identifierP
+  bc <- identifierP
+  whitespaceP
   try (string "bags") <|> (string "bag")
   return $ Bag bt bc
 
-containerBag = do
-  cb <- bag
-  whitespace
+containerBagP= do
+  cb <- bagP
+  whitespaceP
   string "contain"
   return cb
 
-containedBags = sepBy bagQuantity (string ", ")
+containedBagsP = sepBy bagQuantityP (string ", ")
 
-nobags = do
-  whitespace
+noBagsP = do
+  whitespaceP
   string "no other bags"
   return []
 
-bagQuantity = do
-  whitespace
-  numBags <- integer
-  whitespace
-  bagType <- bag
+bagQuantityP = do
+  numBags <- integerP
+  bagType <- bagP
   return $ BagQuantity (read numBags) bagType
 
 eol = string ".\n"
-whitespace = many $ oneOf " \t"
-identifier = many1 $ oneOf ['a'..'z']
-integer = many1 $ digit
+whitespaceP = many $ oneOf " \t"
+identifierP = whitespaceP >> (many1 $ oneOf ['a'..'z'])
+integerP = whitespaceP >> (many1 $ digit)
 
-parseCSV :: String -> Either ParseError [(Bag, [BagQuantity])]
-parseCSV input = parse csvFile "(unknown)" input
+type ContainMap = [(Bag, [BagQuantity])]
 
-d7Main = do
-  input <- readFile "d7.dat"
-  case parseCSV input of
+parseFile :: String -> Either ParseError ContainMap
+parseFile input = parse fileP "(unknown)" input
+
+directContainBag :: ContainMap -> Bag -> [Bag]
+directContainBag cmap bag =
+  [ holder | (holder, held) <- cmap, bag `elem ` (map bagType held)]
+  where bagType (BagQuantity _ t) = t
+
+canContainBag :: ContainMap -> Bag -> [Bag]
+canContainBag cmap bag =
+  if (canContainThis == []) then
+    []
+  else
+    canContainThis ++ (nub (concatMap (canContainBag cmap) canContainThis))
+  where canContainThis = directContainBag cmap bag
+
+d7Data :: String -> IO ContainMap
+d7Data fileName = do
+  input <- readFile fileName
+  case parseFile input of
     Left e -> do putStrLn "Error parsing input:"
                  print e
-    Right r -> mapM_ print r
+                 return []
+    Right r -> return r
+
+d7Main = do
+  bagContentsMap <- d7Data "d7test.dat"
+  mapM_ print (canContainBag bagContentsMap (Bag "shiny" "gold"))
