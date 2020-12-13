@@ -3,8 +3,9 @@ module D7 where
 import Data.List
 import Text.ParserCombinators.Parsec
 
-data Bag  = Bag String String deriving(Show, Eq)
-data BagQuantity = BagQuantity Int Bag deriving(Show, Eq)
+data Bag  = Bag String String deriving(Show, Ord,Eq)
+data BagQuantity = BagQuantity Int Bag deriving(Show)
+type ContainMap = [(Bag, [BagQuantity])]
 
 --
 -- Parser
@@ -47,10 +48,23 @@ whitespaceP = many $ oneOf " \t"
 identifierP = whitespaceP >> (many1 $ oneOf ['a'..'z'])
 integerP = whitespaceP >> (many1 $ digit)
 
-type ContainMap = [(Bag, [BagQuantity])]
-
 parseFile :: String -> Either ParseError ContainMap
 parseFile input = parse fileP "(unknown)" input
+
+--
+-- Solution
+--
+mergeSorted :: (Eq a, Ord a) => [a] -> [a] ->[a]
+mergeSorted x [] = x
+mergeSorted [] x = x
+mergeSorted (x:xs) (y:ys)
+  | (x == y) = x : mergeSorted xs ys
+  | (x <  y) = x : mergeSorted xs (y:ys)
+  | otherwise  = y : mergeSorted (x:xs) ys
+
+mergeMap :: Ord b => (a -> [b]) -> [a] -> [b]
+mergeMap _ [] = []
+mergeMap f (x:xs) = mergeSorted (f x) (mergeMap f xs)
 
 directContainBag :: ContainMap -> Bag -> [Bag]
 directContainBag cmap bag =
@@ -62,7 +76,7 @@ canContainBag cmap bag =
   if (canContainThis == []) then
     []
   else
-    canContainThis ++ (nub (concatMap (canContainBag cmap) canContainThis))
+    mergeSorted canContainThis (mergeMap (canContainBag cmap) canContainThis)
   where canContainThis = directContainBag cmap bag
 
 d7Data :: String -> IO ContainMap
@@ -72,8 +86,13 @@ d7Data fileName = do
     Left e -> do putStrLn "Error parsing input:"
                  print e
                  return []
-    Right r -> return r
+    Right r -> return $ sortOn fst (map sortContainedBags r)
+               where sortContainedBags (b, bq) = (b, sortOn bagType bq)
+                     bagType (BagQuantity _ t) = t
 
+d7Main :: IO ()
 d7Main = do
-  bagContentsMap <- d7Data "d7test.dat"
-  mapM_ print (canContainBag bagContentsMap (Bag "shiny" "gold"))
+  bagContentsMap <- d7Data "d7.dat"
+  let shinyGoldContainers = canContainBag bagContentsMap (Bag "shiny" "gold")
+  mapM_ print shinyGoldContainers
+  print $ length shinyGoldContainers
