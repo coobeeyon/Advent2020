@@ -90,9 +90,19 @@ d7Data fileName = do
                where sortContainedBags (b, bq) = (b, sortOn bagType bq)
                      bagType (BagQuantity _ t) = t
 
+numContained :: ContainMap -> BagQuantity -> Int
+numContained cmap (BagQuantity n b) =
+  n * ( 1 + case contained of
+              Just bags -> sum ( map ( numContained cmap ) bags )
+              Nothing -> 0
+      )
+  where contained = lookup b cmap
+
 d7Main :: IO ()
 d7Main = do
   bagContentsMap <- d7Data "d7.dat"
   let shinyGoldContainers = canContainBag bagContentsMap (Bag "shiny" "gold")
   mapM_ print shinyGoldContainers
   print $ length shinyGoldContainers
+  let shinyGoldContained = numContained bagContentsMap (BagQuantity 1 (Bag "shiny" "gold")) - 1
+  print shinyGoldContained
