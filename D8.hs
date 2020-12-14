@@ -15,7 +15,7 @@ type Program = [Instruction]
 
 data MachineState  = MachineState {acc :: Int, sp :: Int}
                    | Undef
-                   deriving(Show)
+                   deriving(Show, Eq)
 
 bootState :: MachineState
 bootState = MachineState{acc=0, sp=0}
@@ -62,6 +62,20 @@ parseFile input = parse fileP "Program" input
 --
 -- Solution
 --
+collisionPoint :: Eq b => (a->b) -> (a->a) -> a -> a
+collisionPoint pr f x = race x (f x)
+  where race slow fast | ((pr slow) == (pr fast)) = slow
+                       | otherwise = race (f slow) ((f.f) fast)
+
+convergencePoint :: Eq b => (a->b) -> (a->a) -> a -> a -> a
+convergencePoint pr f x y
+  | ((pr x) == (pr y)) = x
+  | otherwise = convergencePoint pr f (f x) (f y)
+
+cycleStart :: Eq b => (a->b) -> (a->a) -> a -> a
+cycleStart pr f x = convergencePoint pr f x (f cp)
+  where cp = collisionPoint pr f x
+
 loadProgram :: String -> IO Program
 loadProgram fileName = do
   input <- readFile fileName
@@ -70,3 +84,11 @@ loadProgram fileName = do
                  print e
                  return []
     Right r -> return r
+
+d7a :: IO ()
+d7a = do
+  program <- loadProgram "d8.dat"
+  let cs = cycleStart sp (step program) bootState
+      runCycle = iterate (step program) cs
+      endCycle = last $ takeWhile ((not . (== (sp cs))) . sp)(tail runCycle)
+  print $ endCycle
