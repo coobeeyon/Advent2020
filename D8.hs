@@ -5,7 +5,7 @@ import Text.ParserCombinators.Parsec
 --
 -- Machine Definitions
 --
-data Instruction = NOP
+data Instruction = NOP Int
             | ACC Int
             | JMP Int
             | UNK
@@ -23,7 +23,7 @@ bootState = MachineState{acc=0, sp=0}
 exec :: Instruction -> MachineState -> MachineState
 exec UNK     _       = Undef
 exec _         Undef = Undef
-exec NOP     inState = inState{ sp  = (sp inState)  + 1}
+exec (NOP _) inState = inState{ sp  = (sp inState)  + 1}
 exec (ACC n) inState = inState{ acc = (acc inState) + n,
                                 sp  = (sp  inState) + 1}
 exec (JMP n) inState = inState{ sp  = (sp inState)  + n}
@@ -38,7 +38,7 @@ step p s = exec opCode s
 --
 deCode :: String -> Int -> Instruction
 deCode "acc" n = ACC n
-deCode "nop" n = NOP
+deCode "nop" n = NOP n
 deCode "jmp" n = JMP n
 deCode _     _ = UNK
 
@@ -59,6 +59,15 @@ integerP = do
 parseFile :: String -> Either ParseError Program
 parseFile input = parse fileP "Program" input
 
+loadProgram :: String -> IO Program
+loadProgram fileName = do
+  input <- readFile fileName
+  case parseFile input of
+    Left e -> do putStrLn "Error parsing input:"
+                 print e
+                 return []
+    Right r -> return r
+
 --
 -- Solution
 --
@@ -76,19 +85,16 @@ cycleStart :: Eq b => (a->b) -> (a->a) -> a -> a
 cycleStart pr f x = convergencePoint pr f x (f cp)
   where cp = collisionPoint pr f x
 
-loadProgram :: String -> IO Program
-loadProgram fileName = do
-  input <- readFile fileName
-  case parseFile input of
-    Left e -> do putStrLn "Error parsing input:"
-                 print e
-                 return []
-    Right r -> return r
-
-d7a :: IO ()
-d7a = do
+d8a :: IO ()
+d8a = do
   program <- loadProgram "d8.dat"
   let cs = cycleStart sp (step program) bootState
       runCycle = iterate (step program) cs
       endCycle = last $ takeWhile ((not . (== (sp cs))) . sp)(tail runCycle)
   print $ endCycle
+
+d8b :: IO ()
+d8b = do
+  program <- loadProgram "d8test.dat"
+  let cs = cycleStart sp (step program) bootState
+  print cs
