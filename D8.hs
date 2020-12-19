@@ -1,5 +1,6 @@
 module D8 where
 
+import Data.List
 import Text.ParserCombinators.Parsec
 
 --
@@ -17,6 +18,10 @@ data MachineState  = MachineState {acc :: Int, sp :: Int}
                    | Undef
                    deriving(Show, Eq)
 
+isUndef :: MachineState -> Bool
+isUndef Undef = True
+isUndef _ = False
+
 bootState :: MachineState
 bootState = MachineState{acc=0, sp=0}
 
@@ -30,8 +35,12 @@ exec (JMP n) inState = inState{ sp  = (sp inState)  + n}
 
 step :: Program -> MachineState -> MachineState
 step _ Undef = Undef
-step p s = exec opCode s
-  where opCode = p !! (sp s)
+step p s
+  | stackIndex < (length p) = exec opCode s
+  | otherwise = Undef
+  where
+    stackIndex = sp s
+    opCode = p !! stackIndex
 
 --
 -- Parser
@@ -71,30 +80,50 @@ loadProgram fileName = do
 --
 -- Solution
 --
-collisionPoint :: Eq b => (a->b) -> (a->a) -> a -> a
-collisionPoint pr f x = race x (f x)
-  where race slow fast | ((pr slow) == (pr fast)) = slow
-                       | otherwise = race (f slow) ((f.f) fast)
+toggle :: Instruction -> Instruction
+toggle (NOP n) = JMP n
+toggle (JMP n) = NOP n
+toggle x = x
 
-convergencePoint :: Eq b => (a->b) -> (a->a) -> a -> a -> a
-convergencePoint pr f x y
-  | ((pr x) == (pr y)) = x
-  | otherwise = convergencePoint pr f (f x) (f y)
+mutate :: Program -> Int -> Program
+mutate p i = h ++ [(toggle . head) t] ++ (tail t)
+  where (h,t) = splitAt i p
 
-cycleStart :: Eq b => (a->b) -> (a->a) -> a -> a
-cycleStart pr f x = convergencePoint pr f x (f cp)
-  where cp = collisionPoint pr f x
+allMutations :: Program -> [Program]
+allMutations p = map (mutate p) [0..(l - 1)]
+  where l = length p
+
+collisionPoint :: (MachineState->MachineState) -> MachineState -> (MachineState, MachineState)
+collisionPoint f x = race x (f x)
+  where
+    race slow Undef = (slow, Undef)
+    race slow fast | ((sp slow) == (sp fast)) = (slow, fast)
+                   | otherwise = race (f slow) ((f.f) fast)
+
+convergencePoint :: (MachineState->MachineState) -> MachineState -> MachineState -> MachineState
+convergencePoint f x y
+  | ((sp x) == (sp y)) = x
+  | otherwise = convergencePoint f (f x) (f y)
+
+cycleStart :: (MachineState->MachineState) -> MachineState -> MachineState
+cycleStart f x = convergencePoint f x (f cp)
+  where (cp, _) = collisionPoint f x
 
 d8a :: IO ()
 d8a = do
   program <- loadProgram "d8.dat"
-  let cs = cycleStart sp (step program) bootState
+  let cs = cycleStart (step program) bootState
       runCycle = iterate (step program) cs
       endCycle = last $ takeWhile ((not . (== (sp cs))) . sp)(tail runCycle)
   print $ endCycle
 
 d8b :: IO ()
 d8b = do
-  program <- loadProgram "d8test.dat"
-  let cs = cycleStart sp (step program) bootState
-  print cs
+  program <- loadProgram "d8.dat"
+  let cPoints = map programCollision (allMutations program)
+        where programCollision p = snd $ collisionPoint (step p) bootState
+  let terminating = [(x,y) | (x,y) <- zip [0..] cPoints, isUndef y]
+      mutIndex = fst . head $ terminating
+      mutProgram = mutate program mutIndex
+      progRun = iterate (step mutProgram) bootState
+  print $ last $ takeWhile (not . isUndef) progRun
