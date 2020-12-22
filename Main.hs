@@ -8,6 +8,7 @@ import D5
 import D6
 import D7
 import D8
+import D9
 
 main :: IO()
 main = do
