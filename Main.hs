@@ -9,6 +9,7 @@ import D6
 import D7
 import D8
 import D9
+import D10
 
 main :: IO()
 main = do
